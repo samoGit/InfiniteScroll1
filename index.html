@@ -1,0 +1,307 @@
+
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scroll Snap</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-snap-type: y mandatory;
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: #000;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            height: 100vh;
+            overflow-y: scroll;
+        }
+
+        .page {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            scroll-snap-align: start;
+            scroll-snap-stop: always;
+        }
+
+        .page-content {
+            text-align: center;
+            color: white;
+            font-size: 28px;
+            font-weight: bold;
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.8);
+            z-index: 1;
+        }
+
+        .emoji {
+            font-size: 80px;
+            margin-bottom: 20px;
+            display: block;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .page-number {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            color: rgba(255,255,255,0.6);
+            font-size: 16px;
+            font-weight: normal;
+        }
+
+        .shimmer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: translateX(-100%);
+            animation: shimmer 4s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+
+        .loading-indicator {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: rgba(255,255,255,0.5);
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+
+        .loading-indicator.show {
+            opacity: 1;
+        }
+
+        /* Force le snap sur iOS */
+        @supports (-webkit-overflow-scrolling: touch) {
+            html {
+                scroll-snap-type: y mandatory;
+            }
+            
+            .page {
+                scroll-snap-align: start;
+                scroll-snap-stop: always;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <!-- Les pages seront générées ici -->
+    </div>
+    
+    <div class="loading-indicator" id="loadingIndicator">
+        Génération de nouvelles pages...
+    </div>
+
+    <script>
+        const container = document.getElementById('container');
+        const loadingIndicator = document.getElementById('loadingIndicator');
+        
+        let currentPage = 0;
+        let totalPages = 0;
+        let isGenerating = false;
+        let lastScrollTime = 0;
+        
+        const colors = [
+            'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+            'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+            'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+            'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+            'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+            'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+            'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+            'linear-gradient(135deg, #ff8a80 0%, #ea4c89 100%)',
+            'linear-gradient(135deg, #8fd3f4 0%, #84fab0 100%)',
+            'linear-gradient(135deg, #d299c2 0%, #fef9d7 100%)',
+            'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+            'linear-gradient(135deg, #fdbb2d 0%, #22c1c3 100%)',
+            'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%)',
+            'linear-gradient(135deg, #a8caba 0%, #5d4e75 100%)',
+            'linear-gradient(135deg, #b465da 0%, #cf6cc9 100%)'
+        ];
+
+        const emojis = [
+            '🌟', '✨', '🎉', '🚀', '💎', '🔥', '🌈', '⭐', '💫', '🎊', 
+            '🌺', '🦄', '🎯', '💝', '🎨', '🎪', '🎭', '🍭', '🎂', '🎁',
+            '🌸', '🦋', '🌙', '☀️', '🌊', '🍀', '🎵', '🎮', '🚁', '🛸'
+        ];
+
+        const phrases = [
+            'Incroyable !', 'Magnifique !', 'Parfait !', 'Génial !', 'Fantastique !',
+            'Merveilleux !', 'Excellent !', 'Superbe !', 'Époustouflant !', 'Extraordinaire !',
+            'Formidable !', 'Éblouissant !', 'Sensationnel !', 'Spectaculaire !', 'Sublime !',
+            'Prodigieux !', 'Remarquable !', 'Stupéfiant !', 'Fascinant !', 'Brillant !'
+        ];
+
+        function createPage(pageNumber) {
+            const page = document.createElement('div');
+            page.className = 'page';
+            page.id = `page-${pageNumber}`;
+            
+            const randomColor = colors[Math.floor(Math.random() * colors.length)];
+            page.style.background = randomColor;
+            
+            const randomEmoji = emojis[Math.floor(Math.random() * emojis.length)];
+            const randomPhrase = phrases[Math.floor(Math.random() * phrases.length)];
+            
+            page.innerHTML = `
+                <div class="shimmer"></div>
+                <div class="page-number">Page ${pageNumber}</div>
+                <div class="page-content">
+                    <span class="emoji">${randomEmoji}</span>
+                    <div>${randomPhrase}</div>
+                    <div style="font-size: 18px; margin-top: 15px; opacity: 0.9;">
+                        ${Math.random() > 0.5 ? '🎲 ' + Math.floor(Math.random() * 1000) : '🎯 ' + Math.floor(Math.random() * 100) + '%'}
+                    </div>
+                </div>
+            `;
+            
+            return page;
+        }
+
+        function generatePages(count) {
+            if (isGenerating) return;
+            isGenerating = true;
+            
+            loadingIndicator.classList.add('show');
+            
+            let generated = 0;
+            
+            function generateBatch() {
+                const batchSize = 2;
+                for (let i = 0; i < batchSize && generated < count; i++) {
+                    totalPages++;
+                    const page = createPage(totalPages);
+                    container.appendChild(page);
+                    generated++;
+                }
+                
+                if (generated < count) {
+                    setTimeout(generateBatch, 10);
+                } else {
+                    setTimeout(() => {
+                        loadingIndicator.classList.remove('show');
+                        isGenerating = false;
+                    }, 300);
+                }
+            }
+            
+            generateBatch();
+        }
+
+        function getCurrentPageNumber() {
+            return Math.round(window.scrollY / window.innerHeight) + 1;
+        }
+
+        function checkForNewGeneration() {
+            currentPage = getCurrentPageNumber();
+            
+            const triggers = [5, 15, 25, 35, 45, 55, 65, 75, 85, 95];
+            const nextTrigger = triggers.find(trigger => 
+                trigger > (currentPage - 10) && trigger <= currentPage
+            );
+            
+            if (nextTrigger && currentPage >= nextTrigger && !isGenerating) {
+                generatePages(10);
+            }
+        }
+
+        // Gestion tactile pour forcer le comportement page par page
+        let touchStartY = 0;
+        let touchEndY = 0;
+        let isScrolling = false;
+
+        document.addEventListener('touchstart', function(e) {
+            touchStartY = e.touches[0].clientY;
+            isScrolling = false;
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function(e) {
+            if (!isScrolling) {
+                isScrolling = true;
+                touchEndY = e.touches[0].clientY;
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', function(e) {
+            if (isScrolling) {
+                const deltaY = touchStartY - touchEndY;
+                const threshold = 50; // Seuil minimum pour déclencher le changement de page
+                
+                if (Math.abs(deltaY) > threshold) {
+                    const currentPageIndex = Math.round(window.scrollY / window.innerHeight);
+                    let targetPage;
+                    
+                    if (deltaY > 0) {
+                        // Scroll vers le bas
+                        targetPage = Math.min(currentPageIndex + 1, totalPages - 1);
+                    } else {
+                        // Scroll vers le haut
+                        targetPage = Math.max(currentPageIndex - 1, 0);
+                    }
+                    
+                    // Force le scroll vers la page cible
+                    window.scrollTo({
+                        top: targetPage * window.innerHeight,
+                        behavior: 'smooth'
+                    });
+                }
+            }
+        }, { passive: true });
+
+        // Génération initiale
+        generatePages(10);
+
+        // Écoute du scroll pour la génération de nouvelles pages
+        let ticking = false;
+        window.addEventListener('scroll', function() {
+            if (!ticking) {
+                requestAnimationFrame(() => {
+                    checkForNewGeneration();
+                    ticking = false;
+                });
+                ticking = true;
+            }
+        }, { passive: true });
+
+        // Vibration subtile lors du changement de page (si supporté)
+        let lastPage = 0;
+        window.addEventListener('scroll', function() {
+            const currentPageNum = getCurrentPageNumber();
+            if (currentPageNum !== lastPage && navigator.vibrate) {
+                navigator.vibrate(10);
+                lastPage = currentPageNum;
+            }
+        }, { passive: true });
+    </script>
+</body>
+</html>
